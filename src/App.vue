@@ -3,23 +3,18 @@
     <router-view />
     <nav class="bottom-nav">
       <router-link to="/" class="nav-item">
-        <span class="nav-icon">📊</span>
         <span class="nav-label">首页</span>
       </router-link>
       <router-link to="/checkin" class="nav-item">
-        <span class="nav-icon">✅</span>
         <span class="nav-label">打卡</span>
       </router-link>
       <router-link to="/tasks" class="nav-item">
-        <span class="nav-icon">📋</span>
         <span class="nav-label">任务</span>
       </router-link>
       <router-link to="/notes" class="nav-item">
-        <span class="nav-icon">📝</span>
         <span class="nav-label">思记</span>
       </router-link>
       <router-link to="/profile" class="nav-item">
-        <span class="nav-icon">⚙️</span>
         <span class="nav-label">我的</span>
       </router-link>
     </nav>
@@ -45,10 +40,12 @@
   display: flex;
   justify-content: space-around;
   align-items: center;
-  background: var(--bg-main);
-  border-top: 1px solid var(--border);
-  padding: var(--space-sm) 0;
-  padding-bottom: max(var(--space-sm), env(safe-area-inset-bottom));
+  background: rgba(20, 20, 20, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 12px 0;
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
   z-index: 100;
 }
 
@@ -56,28 +53,53 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: var(--space-xs) var(--space);
-  color: var(--text-tertiary);
+  justify-content: center;
+  padding: 8px 16px;
+  color: rgba(255, 255, 255, 0.5);
   text-decoration: none;
   transition: all 0.2s ease;
-  border-radius: var(--radius);
-}
-
-.nav-item:hover {
-  background: var(--bg-secondary);
+  position: relative;
 }
 
 .nav-item.router-link-active {
-  color: var(--accent);
+  color: rgba(255, 255, 255, 1);
 }
 
-.nav-icon {
-  font-size: 20px;
+.nav-item.router-link-active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 2px;
+  background: rgba(255, 255, 255, 1);
+  border-radius: 2px;
 }
 
 .nav-label {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+/* Light mode */
+@media (prefers-color-scheme: light) {
+  .bottom-nav {
+    background: rgba(255, 255, 255, 0.8);
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+  }
+  
+  .nav-item {
+    color: rgba(0, 0, 0, 0.4);
+  }
+  
+  .nav-item.router-link-active {
+    color: rgba(0, 0, 0, 1);
+  }
+  
+  .nav-item.router-link-active::after {
+    background: rgba(0, 0, 0, 1);
+  }
 }
 </style>
