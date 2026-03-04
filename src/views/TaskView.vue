@@ -1,143 +1,141 @@
 <template>
-  <div class="task-view">
-    <!-- 分类标签 -->
-    <div class="category-tabs">
-      <button
-        v-for="cat in categories"
-        :key="cat"
-        :class="{ active: selectedCategory === cat }"
-        @click="selectedCategory = cat"
-      >
-        {{ cat }}
-      </button>
-    </div>
+  <div class="page">
+    <div class="container">
+      <header class="header">
+        <h1 class="page-title">任务</h1>
+        <p class="page-subtitle">高效完成每一件事</p>
+      </header>
 
-    <!-- 任务列表 -->
-    <div class="task-list">
-      <div v-if="filteredTasks.length === 0" class="empty-state">
-        <div class="empty-icon">📋</div>
-        <p>暂无任务</p>
-        <span>点击右上角 + 新建任务</span>
-      </div>
+      <!-- 任务筛选 -->
+      <section class="section">
+        <div class="filter-bar">
+          <div class="filter-group">
+            <button 
+              :class="['filter-btn', filter === 'all' ? 'active' : '']"
+              @click="filter = 'all'"
+            >全部</button>
+            <button 
+              :class="['filter-btn', filter === 'pending' ? 'active' : '']"
+              @click="filter = 'pending'"
+            >待办</button>
+            <button 
+              :class="['filter-btn', filter === 'completed' ? 'active' : '']"
+              @click="filter = 'completed'"
+            >已完成</button>
+          </div>
+          <button class="btn btn-primary btn-sm" @click="showAddDialog = true">
+            + 新建任务
+          </button>
+        </div>
+      </section>
 
-      <div
-        v-for="task in filteredTasks"
-        :key="task.id"
-        class="task-card"
-        :class="`level-${task.level}`"
-        @click="openTaskDetail(task)"
-      >
-        <div class="task-header">
-          <h3 class="task-title">{{ task.title }}</h3>
-          <div class="badges">
-            <span class="level-badge" :class="`level-${task.level}`">
-              {{ levelLabels[task.level] }}
-            </span>
-            <span class="status-badge" :class="`status-${task.status}`">
-              {{ statusLabels[task.status] }}
-            </span>
+      <!-- 任务列表 -->
+      <section class="section">
+        <div class="task-list">
+          <div 
+            v-for="task in filteredTasks" 
+            :key="task.id"
+            :class="['task-card', { completed: task.status === 2 }]">
+            <div class="task-header">
+              <div class="task-title-row">
+                <input 
+                  type="checkbox"
+                  :checked="task.status === 2"
+                  @change="toggleTask(task, $event.target.checked)"
+                  class="task-checkbox"
+                />
+                <h3 class="task-title">{{ task.title }}</h3>
+              </div>
+              <div class="task-actions">
+                <button class="btn btn-ghost btn-sm" @click="editTask(task)">编辑</button>
+                <button class="btn btn-ghost btn-sm" @click="deleteTask(task.id)">删除</button>
+              </div>
+            </div>
+            
+            <p v-if="task.description" class="task-description">{{ task.description }}</p>
+            
+            <div class="task-meta">
+              <span v-if="task.level" :class="['task-level-badge', levelClass(task.level)]">
+                {{ levelLabel(task.level) }}
+              </span>
+              <span v-if="task.deadline" class="task-deadline">
+                📅 {{ formatDate(task.deadline) }}
+              </span>
+              <span v-if="task.duration" class="task-duration">
+                ⏱️ {{ formatDuration(task.duration) }}
+              </span>
+            </div>
+          </div>
+          
+          <div v-if="filteredTasks.length === 0" class="empty-state">
+            <p>暂无任务</p>
           </div>
         </div>
+      </section>
 
-        <p v-if="task.description" class="task-desc">{{ task.description }}</p>
-
-        <div class="task-meta">
-          <div class="meta-item">
-            <span class="icon">⏱</span>
-            <span>{{ formatDuration(task.duration) }}</span>
+      <!-- 添加/编辑任务对话框 -->
+      <div v-if="showAddDialog || editingTask" class="dialog-overlay" @click="closeDialog">
+        <div class="dialog" @click.stop>
+          <h3 class="dialog-title">{{ editingTask ? '编辑任务' : '新建任务' }}</h3>
+          
+          <div class="form-group">
+            <label class="form-label">标题</label>
+            <input 
+              v-model="formData.title"
+              class="input"
+              placeholder="任务标题"
+            />
           </div>
-          <div class="meta-item">
-            <span class="icon">📅</span>
-            <span>{{ formatDate(task.startTime) }}</span>
+          
+          <div class="form-group">
+            <label class="form-label">描述</label>
+            <textarea 
+              v-model="formData.description"
+              class="input textarea"
+              placeholder="任务描述（可选）"
+              rows="3"
+            />
           </div>
-          <div class="meta-item">
-            <span class="icon">🚩</span>
-            <span>{{ formatDate(task.endTime) }}</span>
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">级别</label>
+              <select v-model="formData.level" class="input">
+                <option :value="1">小</option>
+                <option :value="2">中</option>
+                <option :value="3">大</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label class="form-label">截止</label>
+              <input 
+                v-model="formData.deadline"
+                type="date"
+                class="input"
+              />
+            </div>
           </div>
-          <div class="mo-points" :class="`level-${task.level}`">
-            <span>⭐</span>
-            <span>{{ task.moPoints }}</span>
+          
+          <div class="form-group">
+            <label class="form-label">预计耗时</label>
+            <select v-model="formData.duration" class="input">
+              <option :value="15">15 分钟</option>
+              <option :value="30">30 分钟</option>
+              <option :value="60">1 小时</option>
+              <option :value="120">2 小时</option>
+              <option :value="240">4 小时</option>
+              <option :value="480">8 小时</option>
+              <option :value="1440">1 天</option>
+              <option :value="2880">2 天</option>
+              <option :value="10080">1 周</option>
+            </select>
           </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 新建按钮 -->
-    <button class="fab" @click="showEditDialog = true">
-      <span>+</span>
-    </button>
-
-    <!-- 任务编辑对话框 -->
-    <div v-if="showEditDialog" class="dialog-overlay" @click="closeDialog">
-      <div class="dialog" @click.stop>
-        <div class="dialog-header">
-          <h3>{{ editingTask ? '编辑任务' : '新建任务' }}</h3>
-          <button @click="closeDialog" class="close-btn">×</button>
-        </div>
-
-        <div class="form-group">
-          <label>任务标题 *</label>
-          <input v-model="formData.title" type="text" placeholder="输入任务标题" />
-        </div>
-
-        <div class="form-group">
-          <label>任务描述</label>
-          <textarea v-model="formData.description" rows="3" placeholder="任务描述（可选）"></textarea>
-        </div>
-
-        <div class="form-group">
-          <label>任务级别</label>
-          <div class="level-selector">
-            <button
-              v-for="(label, key) in levelLabels"
-              :key="key"
-              :class="{ active: formData.level === key }"
-              @click="selectLevel(key)"
-            >
-              {{ label }}
-            </button>
+          
+          <div class="dialog-actions">
+            <button class="btn btn-ghost" @click="closeDialog">取消</button>
+            <button class="btn btn-primary" @click="saveTask">保存</button>
           </div>
-        </div>
-
-        <div class="form-group">
-          <label>墨点数 ({{ getMoPointRange(formData.level).min }}~{{ getMoPointRange(formData.level).max }})</label>
-          <input
-            v-model.number="formData.moPoints"
-            type="range"
-            :min="getMoPointRange(formData.level).min"
-            :max="getMoPointRange(formData.level).max"
-          />
-          <div class="range-value">{{ formData.moPoints }} 墨点</div>
-        </div>
-
-        <div class="form-group">
-          <label>时长</label>
-          <select v-model="formData.duration">
-            <option :value="15">15 分钟</option>
-            <option :value="30">30 分钟</option>
-            <option :value="60">1 小时</option>
-            <option :value="120">2 小时</option>
-            <option :value="240">4 小时</option>
-            <option :value="1440">1 天</option>
-            <option :value="4320">3 天</option>
-            <option :value="10080">7 天</option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label>起始时间</label>
-          <input v-model="formData.startTime" type="datetime-local" />
-        </div>
-
-        <div class="form-group">
-          <label>截止时间</label>
-          <input v-model="formData.endTime" type="datetime-local" />
-        </div>
-
-        <div class="dialog-actions">
-          <button v-if="editingTask" @click="deleteTask" class="btn-delete">删除</button>
-          <button @click="closeDialog" class="btn-cancel">取消</button>
-          <button @click="saveTask" class="btn-confirm">{{ editingTask ? '保存' : '创建' }}</button>
         </div>
       </div>
     </div>
@@ -148,492 +146,353 @@
 import { ref, computed, onMounted } from 'vue'
 import { useTaskStore } from '../stores/task'
 
-const store = useTaskStore()
+const taskStore = useTaskStore()
 
-const categories = ['全部分类', '学习', '工作项目', '财务分析', '个人成长']
-const selectedCategory = ref('全部分类')
-const showEditDialog = ref(false)
+const filter = ref('all')
+const showAddDialog = ref(false)
 const editingTask = ref(null)
-
-const levelLabels = {
-  0: '小',
-  1: '中',
-  2: '大'
-}
-
-const statusLabels = {
-  0: '未接取',
-  1: '进行中',
-  2: '完成'
-}
-
 const formData = ref({
   title: '',
   description: '',
-  level: 0,
-  moPoints: 10,
-  duration: 60,
-  startTime: '',
-  endTime: '',
-  status: 0,
-  category: ''
+  level: 2,
+  deadline: '',
+  duration: 60
 })
 
 const filteredTasks = computed(() => {
-  if (selectedCategory.value === '全部分类') {
-    return store.tasks
+  let tasks = taskStore.tasks
+  
+  if (filter.value === 'pending') {
+    tasks = tasks.filter(t => t.status !== 2)
+  } else if (filter.value === 'completed') {
+    tasks = tasks.filter(t => t.status === 2)
   }
-  return store.tasks.filter(t => t.category === selectedCategory.value)
+  
+  return tasks.sort((a, b) => {
+    // 未完成的任务排在前面
+    if (a.status !== b.status) {
+      return a.status - b.status
+    }
+    // 按创建时间倒序
+    return new Date(b.created_at) - new Date(a.created_at)
+  })
 })
 
-const selectLevel = (level) => {
-  formData.value.level = level
-  const range = getMoPointRange(level)
-  if (formData.value.moPoints < range.min) {
-    formData.value.moPoints = range.min
-  } else if (formData.value.moPoints > range.max) {
-    formData.value.moPoints = range.max
-  }
+function levelLabel(level) {
+  return { 1: '小', 2: '中', 3: '大' }[level] || '中'
 }
 
-const getMoPointRange = (level) => {
-  const ranges = [
-    { min: 10, max: 30 },
-    { min: 30, max: 100 },
-    { min: 100, max: 500 }
-  ]
-  return ranges[level] || ranges[0]
+function levelClass(level) {
+  return `level-${level}`
 }
 
-const formatDuration = (minutes) => {
-  if (minutes >= 1440) {
-    return `${Math.floor(minutes / 1440)}天`
-  } else if (minutes >= 60) {
-    return `${Math.floor(minutes / 60)}h${minutes % 60}m`
-  }
-  return `${minutes}m`
-}
-
-const formatDate = (dateStr) => {
+function formatDate(dateStr) {
+  if (!dateStr) return ''
   const date = new Date(dateStr)
-  return `${date.getMonth() + 1}/${date.getDate()}`
+  return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
 }
 
-const openTaskDetail = (task) => {
+function formatDuration(minutes) {
+  if (!minutes) return ''
+  if (minutes < 60) return `${minutes}分钟`
+  if (minutes < 1440) return `${Math.round(minutes / 60)}小时`
+  return `${Math.round(minutes / 1440)}天`
+}
+
+function toggleTask(task, checked) {
+  const updatedTask = {
+    ...task,
+    status: checked ? 2 : 0
+  }
+  taskStore.updateTask(task.id, updatedTask)
+}
+
+function editTask(task) {
   editingTask.value = task
   formData.value = {
     title: task.title,
-    description: task.description,
-    level: task.level,
-    moPoints: task.moPoints,
-    duration: task.duration,
-    startTime: task.startTime,
-    endTime: task.endTime,
-    status: task.status,
-    category: task.category
+    description: task.description || '',
+    level: task.level || 2,
+    deadline: task.deadline ? task.deadline.split('T')[0] : '',
+    duration: task.duration || 60
   }
-  showEditDialog.value = true
 }
 
-const closeDialog = () => {
-  showEditDialog.value = false
+function deleteTask(id) {
+  if (confirm('确定要删除这个任务吗？')) {
+    taskStore.deleteTask(id)
+  }
+}
+
+function closeDialog() {
+  showAddDialog.value = false
   editingTask.value = null
   resetForm()
 }
 
-const resetForm = () => {
+function resetForm() {
   formData.value = {
     title: '',
     description: '',
-    level: 0,
-    moPoints: 10,
-    duration: 60,
-    startTime: new Date().toISOString().slice(0, 16),
-    endTime: new Date(Date.now() + 86400000).toISOString().slice(0, 16),
-    status: 0,
-    category: ''
+    level: 2,
+    deadline: '',
+    duration: 60
   }
 }
 
-const saveTask = () => {
-  if (!formData.value.title.trim()) return
-
-  const task = {
-    id: editingTask.value?.id || Date.now().toString(),
+function saveTask() {
+  if (!formData.value.title.trim()) {
+    alert('请输入任务标题')
+    return
+  }
+  
+  const taskData = {
     ...formData.value,
-    createdAt: editingTask.value?.createdAt || new Date().toISOString()
+    status: editingTask.value ? editingTask.value.status : 0,
+    category: '',
+    created_at: editingTask.value ? editingTask.value.created_at : new Date().toISOString()
   }
-
+  
   if (editingTask.value) {
-    store.updateTask(task.id, task)
+    taskStore.updateTask(editingTask.value.id, taskData)
   } else {
-    store.addTask(task)
+    taskData.id = Date.now().toString()
+    taskStore.addTask(taskData)
   }
-
+  
   closeDialog()
 }
 
-const deleteTask = () => {
-  if (editingTask.value && confirm('确定要删除这个任务吗？')) {
-    store.removeTask(editingTask.value.id)
-    closeDialog()
-  }
-}
-
 onMounted(() => {
-  store.fetchTasks()
-  resetForm()
+  taskStore.fetchTasks()
 })
 </script>
 
 <style scoped>
-.task-view {
-  padding: 20px;
-  height: 100%;
-  overflow-y: auto;
+.header {
+  margin-bottom: var(--space-xl);
 }
 
-/* 分类标签 */
-.category-tabs {
+.section {
+  margin-bottom: var(--space-lg);
+}
+
+.filter-bar {
   display: flex;
-  gap: 8px;
-  margin-bottom: 20px;
-  overflow-x: auto;
-  padding-bottom: 8px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space);
 }
 
-.category-tabs button {
-  padding: 10px 20px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
-  color: #b0b0b0;
+.filter-group {
+  display: flex;
+  gap: var(--space-xs);
+  background: var(--bg-secondary);
+  padding: var(--space-xs);
+  border-radius: var(--radius);
+}
+
+.filter-btn {
+  padding: var(--space-xs) var(--space);
   font-size: 14px;
-  white-space: nowrap;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
 }
 
-.category-tabs button:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
+.filter-btn:hover {
+  color: var(--text-primary);
 }
 
-.category-tabs button.active {
-  background: rgba(74, 144, 226, 0.2);
-  border-color: #4A90E2;
-  color: #4A90E2;
+.filter-btn.active {
+  background: var(--bg-main);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
 }
 
-/* 任务列表 */
 .task-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space);
 }
 
-.empty-state {
-  text-align: center;
-  padding: 60px 20px;
-  color: #666;
-}
-
-.empty-icon {
-  font-size: 64px;
-  margin-bottom: 16px;
-  opacity: 0.5;
-}
-
-.empty-state p {
-  font-size: 16px;
-  margin-bottom: 8px;
-}
-
-.empty-state span {
-  font-size: 14px;
-  color: #888;
-}
-
-/* 任务卡片 */
 .task-card {
-  background: rgba(30, 30, 46, 0.8);
-  border-radius: 12px;
-  padding: 16px;
-  cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  padding: var(--space-lg);
+  transition: all 0.2s ease;
 }
 
 .task-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  background: var(--bg-tertiary);
+}
+
+.task-card.completed {
+  opacity: 0.6;
+}
+
+.task-card.completed .task-title {
+  text-decoration: line-through;
 }
 
 .task-header {
   display: flex;
-  justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 8px;
+  justify-content: space-between;
+  gap: var(--space);
+  margin-bottom: var(--space);
+}
+
+.task-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space);
+  flex: 1;
+}
+
+.task-checkbox {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  flex-shrink: 0;
 }
 
 .task-title {
   font-size: 16px;
-  font-weight: bold;
-  color: #ffffff;
-  margin: 0;
+  font-weight: 500;
+  color: var(--text-primary);
   flex: 1;
 }
 
-.badges {
+.task-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--space-xs);
 }
 
-.level-badge, .status-badge {
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: bold;
-}
-
-.level-badge.level-0 { background: rgba(76, 175, 80, 0.2); color: #4CAF50; border: 1px solid #4CAF50; }
-.level-badge.level-1 { background: rgba(255, 152, 0, 0.2); color: #FF9800; border: 1px solid #FF9800; }
-.level-badge.level-2 { background: rgba(244, 67, 54, 0.2); color: #F44336; border: 1px solid #F44336; }
-
-.status-badge.status-0 { background: rgba(158, 158, 158, 0.2); color: #9E9E9E; border: 1px solid #9E9E9E; }
-.status-badge.status-1 { background: rgba(74, 144, 226, 0.2); color: #4A90E2; border: 1px solid #4A90E2; }
-.status-badge.status-2 { background: rgba(76, 175, 80, 0.2); color: #4CAF50; border: 1px solid #4CAF50; }
-
-.task-desc {
-  color: #888;
+.task-description {
   font-size: 14px;
-  margin: 0 0 12px;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  color: var(--text-secondary);
+  margin-bottom: var(--space);
+  line-height: 1.6;
 }
 
 .task-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  align-items: center;
+  gap: var(--space-sm);
 }
 
-.meta-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+.task-level-badge {
   font-size: 12px;
-  color: #888;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
 }
 
-.meta-item .icon {
-  font-size: 14px;
+.task-level-badge.level-1 {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--accent);
 }
 
-.mo-points {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  border-radius: 12px;
+.task-level-badge.level-2 {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--warning);
+}
+
+.task-level-badge.level-3 {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--error);
+}
+
+.task-deadline,
+.task-duration {
   font-size: 12px;
-  font-weight: bold;
+  color: var(--text-tertiary);
 }
 
-.mo-points.level-0 { background: #4CAF50; color: #ffffff; }
-.mo-points.level-1 { background: #FF9800; color: #ffffff; }
-.mo-points.level-2 { background: #F44336; color: #ffffff; }
-
-/* 浮动按钮 */
-.fab {
-  position: fixed;
-  bottom: 100px;
-  right: 20px;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #4A90E2 0%, #67A3F5 100%);
-  border: none;
-  color: #ffffff;
-  font-size: 28px;
-  cursor: pointer;
-  box-shadow: 0 4px 16px rgba(74, 144, 226, 0.4);
-  transition: transform 0.2s, box-shadow 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.empty-state {
+  text-align: center;
+  padding: var(--space-2xl);
+  color: var(--text-tertiary);
 }
 
-.fab:hover {
-  transform: scale(1.1);
-  box-shadow: 0 6px 20px rgba(74, 144, 226, 0.5);
-}
-
-/* 对话框 */
 .dialog-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 2000;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease;
 }
 
 .dialog {
-  background: #1e1e2e;
-  border-radius: 16px;
+  background: var(--bg-main);
+  padding: var(--space-xl);
+  border-radius: var(--radius-lg);
   width: 90%;
   max-width: 500px;
   max-height: 90vh;
   overflow-y: auto;
+  animation: slideUp 0.3s ease;
 }
 
-.dialog-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.dialog-header h3 {
-  margin: 0;
-  color: #ffffff;
+.dialog-title {
   font-size: 18px;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  color: #ffffff;
-  font-size: 28px;
-  cursor: pointer;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.close-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
+  font-weight: 500;
+  margin-bottom: var(--space-lg);
+  color: var(--text-primary);
 }
 
 .form-group {
-  padding: 16px 20px;
+  margin-bottom: var(--space);
 }
 
-.form-group label {
+.form-label {
   display: block;
-  color: #888;
   font-size: 14px;
-  margin-bottom: 8px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-xs);
 }
 
-.form-group input[type="text"],
-.form-group textarea,
-.form-group select,
-.form-group input[type="datetime-local"] {
-  width: 100%;
-  padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  color: #ffffff;
-  font-size: 14px;
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space);
 }
 
-.form-group input:focus,
-.form-group textarea:focus,
-.form-group select:focus {
-  outline: none;
-  border-color: #4A90E2;
-}
-
-.level-selector {
-  display: flex;
-  gap: 12px;
-}
-
-.level-selector button {
-  flex: 1;
-  padding: 12px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  color: #888;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.level-selector button.active {
-  border-color: #4A90E2;
-  color: #4A90E2;
-  background: rgba(74, 144, 226, 0.1);
-}
-
-.form-group input[type="range"] {
-  width: 100%;
-  margin-top: 8px;
-}
-
-.range-value {
-  text-align: center;
-  color: #4A90E2;
-  font-weight: bold;
-  margin-top: 8px;
+.textarea {
+  resize: vertical;
+  min-height: 80px;
 }
 
 .dialog-actions {
   display: flex;
-  gap: 12px;
-  padding: 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  gap: var(--space);
+  margin-top: var(--space-lg);
+  justify-content: flex-end;
 }
 
-.btn-cancel, .btn-confirm, .btn-delete {
-  flex: 1;
-  padding: 12px;
-  border-radius: 8px;
-  font-size: 14px;
-  cursor: pointer;
-  border: none;
-  transition: all 0.2s;
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
-.btn-cancel {
-  background: transparent;
-  color: #888;
-}
-
-.btn-cancel:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.btn-confirm {
-  background: #4A90E2;
-  color: #ffffff;
-}
-
-.btn-confirm:hover {
-  background: #5a9ff2;
-}
-
-.btn-delete {
-  background: rgba(244, 67, 54, 0.2);
-  color: #F44336;
-}
-
-.btn-delete:hover {
-  background: rgba(244, 67, 54, 0.3);
+@keyframes slideUp {
+  from { 
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>

@@ -1,88 +1,80 @@
 <template>
-  <div class="note-view">
-    <!-- 类型切换 -->
-    <div class="type-selector">
-      <button
-        :class="{ active: currentType === 'review' }"
-        @click="setType('review')"
-      >
-        复盘
-      </button>
-      <button
-        :class="{ active: currentType === 'memo' }"
-        @click="setType('memo')"
-      >
-        备忘录
-      </button>
-    </div>
+  <div class="page">
+    <div class="container">
+      <header class="header">
+        <h1 class="page-title">思记</h1>
+        <p class="page-subtitle">记录思考与感悟</p>
+      </header>
 
-    <!-- 思记列表 -->
-    <div class="note-grid">
-      <div v-if="filteredNotes.length === 0" class="empty-state">
-        <div class="empty-icon">{{ currentType === 'review' ? '📖' : '📝' }}</div>
-        <p>暂无{{ currentType === 'review' ? '复盘' : '备忘录' }}</p>
-        <span>点击右下角 + 新建</span>
-      </div>
-
-      <div
-        v-for="note in filteredNotes"
-        :key="note.id"
-        class="note-card"
-        @click="openNote(note)"
-      >
-        <h3 class="note-title">{{ note.title || '无标题' }}</h3>
-        <p class="note-content">{{ note.content || '点击添加内容...' }}</p>
-        <div class="note-meta">
-          <span class="note-time">🕐 {{ formatTime(note.createdAt) }}</span>
-          <span v-if="note.reminderTime" class="note-reminder">
-            ⏰ {{ formatTime(note.reminderTime) }}
-          </span>
+      <section class="section">
+        <div class="toolbar">
+          <button class="btn btn-primary" @click="showAddDialog = true">
+            + 新建思记
+          </button>
         </div>
-      </div>
-    </div>
+      </section>
 
-    <!-- 新建按钮 -->
-    <button class="fab" @click="openEdit()">
-      <span>+</span>
-    </button>
-
-    <!-- 编辑对话框 -->
-    <div v-if="showEditDialog" class="dialog-overlay" @click="closeDialog">
-      <div class="dialog" @click.stop>
-        <div class="dialog-header">
-          <h3>{{ editingNote ? '编辑' : '新建' }}</h3>
-          <button @click="closeDialog" class="close-btn">×</button>
+      <section class="section">
+        <div class="note-grid">
+          <div 
+            v-for="note in notes" 
+            :key="note.id"
+            class="note-card card"
+            @click="editNote(note)"
+          >
+            <div class="note-header">
+              <h3 class="note-title">{{ note.title || '无标题' }}</h3>
+              <span class="note-date">{{ formatDate(note.created_at) }}</span>
+            </div>
+            <p class="note-content">{{ truncate(note.content, 150) }}</p>
+            <div class="note-footer">
+              <span v-if="note.type === 1" class="note-type-badge">复盘</span>
+              <span v-else-if="note.type === 2" class="note-type-badge">备忘录</span>
+            </div>
+          </div>
+          
+          <div v-if="notes.length === 0" class="empty-state">
+            <p>暂无思记</p>
+          </div>
         </div>
+      </section>
 
-        <div class="form-group">
-          <input
-            v-model="formData.title"
-            type="text"
-            placeholder="标题（可选）"
-            class="title-input"
-          />
-        </div>
-
-        <div class="form-group">
-          <textarea
-            v-model="formData.content"
-            placeholder="在这里输入内容..."
-            rows="10"
-            class="content-input"
-          ></textarea>
-        </div>
-
-        <div class="form-group">
-          <label>
-            {{ currentType === 'review' ? '记录时间' : '提醒时间' }}
-          </label>
-          <input v-model="formData.reminderTime" type="datetime-local" />
-        </div>
-
-        <div class="dialog-actions">
-          <button v-if="editingNote" @click="deleteNote" class="btn-delete">删除</button>
-          <button @click="closeDialog" class="btn-cancel">取消</button>
-          <button @click="saveNote" class="btn-confirm">保存</button>
+      <!-- 添加/编辑对话框 -->
+      <div v-if="showAddDialog || editingNote" class="dialog-overlay" @click="closeDialog">
+        <div class="dialog" @click.stop>
+          <h3 class="dialog-title">{{ editingNote ? '编辑思记' : '新建思记' }}</h3>
+          
+          <div class="form-group">
+            <label class="form-label">标题</label>
+            <input 
+              v-model="formData.title"
+              class="input"
+              placeholder="标题（可选）"
+            />
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">类型</label>
+            <select v-model="formData.type" class="input">
+              <option :value="1">复盘</option>
+              <option :value="2">备忘录</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">内容</label>
+            <textarea 
+              v-model="formData.content"
+              class="input textarea"
+              placeholder="记录你的思考和感悟..."
+              rows="10"
+            />
+          </div>
+          
+          <div class="dialog-actions">
+            <button class="btn btn-ghost" @click="closeDialog">取消</button>
+            <button class="btn btn-primary" @click="saveNote">保存</button>
+          </div>
         </div>
       </div>
     </div>
@@ -93,377 +85,232 @@
 import { ref, computed, onMounted } from 'vue'
 import { useNoteStore } from '../stores/note'
 
-const store = useNoteStore()
+const noteStore = useNoteStore()
 
-const currentType = ref('review')
-const showEditDialog = ref(false)
+const showAddDialog = ref(false)
 const editingNote = ref(null)
-
 const formData = ref({
   title: '',
   content: '',
-  reminderTime: ''
+  type: 2
 })
 
-const filteredNotes = computed(() => {
-  const type = currentType.value === 'review' ? 0 : 1
-  return store.notes.filter(n => n.type === type)
-})
+const notes = computed(() => noteStore.notes)
 
-const setType = (type) => {
-  currentType.value = type
-  store.setType(type === 'review' ? 0 : 1)
-}
-
-const formatTime = (dateStr) => {
+function formatDate(dateStr) {
+  if (!dateStr) return ''
   const date = new Date(dateStr)
-  return `${date.getMonth() + 1}/${date.getDate()} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
+  const now = new Date()
+  const diff = now - date
+  
+  if (diff < 24 * 60 * 60 * 1000) {
+    return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  } else if (diff < 7 * 24 * 60 * 60 * 1000) {
+    return date.toLocaleDateString('zh-CN', { weekday: 'long' })
+  } else {
+    return date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' })
+  }
 }
 
-const openEdit = (note = null) => {
+function truncate(text, len) {
+  if (!text) return ''
+  return text.length > len ? text.slice(0, len) + '...' : text
+}
+
+function editNote(note) {
   editingNote.value = note
-  if (note) {
-    formData.value = {
-      title: note.title,
-      content: note.content,
-      reminderTime: note.reminderTime ? note.reminderTime.slice(0, 16) : ''
-    }
-  } else {
-    formData.value = {
-      title: '',
-      content: '',
-      reminderTime: new Date().toISOString().slice(0, 16)
-    }
+  formData.value = {
+    title: note.title || '',
+    content: note.content || '',
+    type: note.type || 2
   }
-  showEditDialog.value = true
 }
 
-const closeDialog = () => {
-  showEditDialog.value = false
+function closeDialog() {
+  showAddDialog.value = false
   editingNote.value = null
+  resetForm()
 }
 
-const saveNote = () => {
-  const note = {
-    id: editingNote.value?.id || Date.now().toString(),
-    title: formData.value.title,
-    content: formData.value.content,
-    type: currentType.value === 'review' ? 0 : 1,
-    createdAt: editingNote.value?.createdAt || new Date().toISOString(),
-    reminderTime: formData.value.reminderTime || null
+function resetForm() {
+  formData.value = {
+    title: '',
+    content: '',
+    type: 2
   }
+}
 
+function saveNote() {
+  if (!formData.value.content.trim()) {
+    alert('请输入内容')
+    return
+  }
+  
+  const noteData = {
+    ...formData.value,
+    created_at: editingNote.value ? editingNote.value.created_at : new Date().toISOString(),
+    reminder_time: null
+  }
+  
   if (editingNote.value) {
-    store.updateNote(note.id, note)
+    noteStore.updateNote(editingNote.value.id, noteData)
   } else {
-    store.addNote(note)
+    noteData.id = Date.now().toString()
+    noteStore.addNote(noteData)
   }
-
+  
   closeDialog()
 }
 
-const deleteNote = () => {
-  if (editingNote.value && confirm('确定要删除吗？')) {
-    store.removeNote(editingNote.value.id)
-    closeDialog()
-  }
-}
-
 onMounted(() => {
-  store.fetchNotes()
+  noteStore.fetchNotes()
 })
 </script>
 
 <style scoped>
-.note-view {
-  padding: 20px;
-  height: 100%;
-  overflow-y: auto;
+.header {
+  margin-bottom: var(--space-xl);
 }
 
-/* 类型切换 */
-.type-selector {
+.section {
+  margin-bottom: var(--space-lg);
+}
+
+.toolbar {
   display: flex;
-  justify-content: center;
-  gap: 16px;
-  margin-bottom: 20px;
+  justify-content: flex-end;
 }
 
-.type-selector button {
-  padding: 10px 32px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
-  color: #b0b0b0;
-  font-size: 15px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.type-selector button:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
-}
-
-.type-selector button.active {
-  background: #4A90E2;
-  border-color: #4A90E2;
-  color: #ffffff;
-}
-
-/* 思记网格 */
 .note-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 12px;
-  padding-bottom: 80px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--space);
+}
+
+.note-card {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  min-height: 200px;
+}
+
+.note-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.note-header {
+  margin-bottom: var(--space);
+}
+
+.note-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: var(--space-xs);
+}
+
+.note-date {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.note-content {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  flex: 1;
+  white-space: pre-wrap;
+}
+
+.note-footer {
+  margin-top: var(--space);
+  padding-top: var(--space);
+  border-top: 1px solid var(--border);
+}
+
+.note-type-badge {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
 }
 
 .empty-state {
   grid-column: 1 / -1;
   text-align: center;
-  padding: 60px 20px;
-  color: #666;
+  padding: var(--space-2xl);
+  color: var(--text-tertiary);
 }
 
-.empty-icon {
-  font-size: 64px;
-  margin-bottom: 16px;
-  opacity: 0.5;
-}
-
-.empty-state p {
-  font-size: 16px;
-  margin-bottom: 8px;
-}
-
-.empty-state span {
-  font-size: 14px;
-  color: #888;
-}
-
-/* 思记卡片 */
-.note-card {
-  background: rgba(30, 30, 46, 0.8);
-  border-radius: 12px;
-  padding: 16px;
-  cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  display: flex;
-  flex-direction: column;
-  min-height: 180px;
-}
-
-.note-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-}
-
-.note-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #ffffff;
-  margin: 0 0 8px;
-}
-
-.note-content {
-  flex: 1;
-  color: #888;
-  font-size: 13px;
-  line-height: 1.5;
-  margin: 0 0 12px;
-  display: -webkit-box;
-  -webkit-line-clamp: 4;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.note-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 12px;
-  color: #666;
-}
-
-.note-reminder {
-  color: #4A90E2;
-}
-
-/* 浮动按钮 */
-.fab {
-  position: fixed;
-  bottom: 100px;
-  right: 20px;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: #4A90E2;
-  border: none;
-  color: #ffffff;
-  font-size: 28px;
-  cursor: pointer;
-  box-shadow: 0 4px 12px rgba(74, 144, 226, 0.3);
-  transition: transform 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.fab:hover {
-  transform: scale(1.1);
-}
-
-/* 对话框 */
 .dialog-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 2000;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease;
 }
 
 .dialog {
-  background: #1e1e2e;
-  border-radius: 16px;
+  background: var(--bg-main);
+  padding: var(--space-xl);
+  border-radius: var(--radius-lg);
   width: 90%;
-  max-width: 500px;
+  max-width: 600px;
   max-height: 90vh;
-  display: flex;
-  flex-direction: column;
+  overflow-y: auto;
+  animation: slideUp 0.3s ease;
 }
 
-.dialog-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.dialog-header h3 {
-  margin: 0;
-  color: #ffffff;
+.dialog-title {
   font-size: 18px;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  color: #ffffff;
-  font-size: 28px;
-  cursor: pointer;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.close-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
+  font-weight: 500;
+  margin-bottom: var(--space-lg);
+  color: var(--text-primary);
 }
 
 .form-group {
-  padding: 16px 20px;
+  margin-bottom: var(--space);
 }
 
-.title-input {
-  width: 100%;
-  padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  color: #ffffff;
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.content-input {
-  width: 100%;
-  padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  color: #ffffff;
-  font-size: 14px;
-  line-height: 1.6;
-  resize: none;
-}
-
-.title-input:focus,
-.content-input:focus,
-input[type="datetime-local"]:focus {
-  outline: none;
-  border-color: #4A90E2;
-}
-
-.form-group label {
+.form-label {
   display: block;
-  color: #888;
   font-size: 14px;
-  margin-bottom: 8px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-xs);
 }
 
-.form-group input[type="datetime-local"] {
-  width: 100%;
-  padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  color: #ffffff;
-  font-size: 14px;
+.textarea {
+  resize: vertical;
+  min-height: 200px;
 }
 
 .dialog-actions {
   display: flex;
-  gap: 12px;
-  padding: 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  gap: var(--space);
+  margin-top: var(--space-lg);
+  justify-content: flex-end;
 }
 
-.btn-cancel, .btn-confirm, .btn-delete {
-  flex: 1;
-  padding: 12px;
-  border-radius: 8px;
-  font-size: 14px;
-  cursor: pointer;
-  border: none;
-  transition: all 0.2s;
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
-.btn-cancel {
-  background: transparent;
-  color: #888;
-}
-
-.btn-cancel:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.btn-confirm {
-  background: #4A90E2;
-  color: #ffffff;
-}
-
-.btn-confirm:hover {
-  background: #5a9ff2;
-}
-
-.btn-delete {
-  background: rgba(244, 67, 54, 0.2);
-  color: #F44336;
-}
-
-.btn-delete:hover {
-  background: rgba(244, 67, 54, 0.3);
+@keyframes slideUp {
+  from { 
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>
